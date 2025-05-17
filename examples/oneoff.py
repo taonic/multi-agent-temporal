@@ -15,13 +15,12 @@ async def greet(name: str) -> str:
 def get_order_status(order_id: str):
     return {
         "order_id": order_id,
-        "expected_delivery": "Tomorrow"
+        "expected_delivery": "Tomorrow",
     }
 
 
 async def main():
     async with Agent(
-        project_id="dse-demos",
         model_name="gemini-2.0-flash",
         instruction="You are a store support API assistant to help with online orders.",
         functions = [greet, get_order_status]

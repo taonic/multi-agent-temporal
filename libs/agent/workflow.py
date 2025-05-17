@@ -1,17 +1,12 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
-from typing import Dict, List, Optional, Any
+from typing import Dict, List
 
 from temporalio import activity, workflow
-from temporalio.client import Client
-from temporalio.worker import Worker
-
-import importlib
-import inspect
 
 with workflow.unsafe.imports_passed_through():
     import vertexai
+    from asyncio import Future
     from vertexai.generative_models import (
         Content,
         FunctionDeclaration,
@@ -19,12 +14,14 @@ with workflow.unsafe.imports_passed_through():
         GenerativeModel,
         GenerationResponse,
         Part,
+        Candidate,
         Tool,
     )
 
 class LLM:
     def __init__(self, model: GenerativeModel, functions: List[callable]) -> None:
         self.model = model
+        # convert functions to vertexai tools
         self.tools = Tool(function_declarations=list(map(FunctionDeclaration.from_func, functions)))
 
     @activity.defn
@@ -55,6 +52,8 @@ class AgentWorkflow:
 
     def __init__(self) -> None:
         self.contents: List[Content] = []
+        self.respond: Future = None
+        self.terminate: bool = False
 
     @workflow.run
     async def run(self, prompt: str) -> str:
@@ -67,13 +66,16 @@ class AgentWorkflow:
             The LLM's final response
         """
 
-        user_prompt_content = Content(
-            role="user",
-            parts=[Part.from_text(prompt)],
-        )
-        self.contents.append(user_prompt_content)
+        if prompt == "":
+            await self.wait_for_prompt()
+        else:
+            user_prompt_content = Content(
+                role="user",
+                parts=[Part.from_text(prompt)],
+            )
+            self.contents.append(user_prompt_content)
 
-        while True:
+        while not self.terminate:
             dict_content = [c.to_dict() for c in self.contents]
             raw_rsp = await workflow.execute_activity(
                 LLM.call_llm,
@@ -87,9 +89,20 @@ class AgentWorkflow:
                 self.contents.append(candidate.content)
                 await self.handle_function_calls(candidate)
             elif candidate.finish_reason == 1:
-                return candidate.content.text
+                # respond message by resolving the future
+                if self.respond:
+                    self.respond.set_result(candidate.content.text)
 
-    async def handle_function_calls(self, candidate) -> None:
+                await self.wait_for_prompt()
+
+        if self.respond:
+            self.respond.set_result("")
+
+    async def wait_for_prompt(self):
+        count = len(self.contents)
+        await workflow.wait_condition(lambda: len(self.contents) != count)
+
+    async def handle_function_calls(self, candidate: Candidate) -> None:
         """Handle function calls from the LLM."""
         parts: List[Part] = []
         for func in candidate.function_calls:
@@ -104,3 +117,21 @@ class AgentWorkflow:
             )
             parts.append(response_part)
         self.contents.append(Content(role="user", parts=parts))
+
+    @workflow.update
+    async def prompt(self, prompt: str) -> str:
+        workflow.logger.debug(f'prompt received: {prompt}')
+        if prompt == "END":
+            self.terminate = True
+
+        new_content = Content(
+            role="user",
+            parts=[Part.from_text(prompt)],
+        )
+        self.contents.append(new_content)
+
+        # wait for respond to be resolved
+        self.respond = asyncio.Future()
+        await workflow.wait([self.respond])
+        return await self.respond
+
