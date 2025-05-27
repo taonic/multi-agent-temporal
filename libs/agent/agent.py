@@ -68,13 +68,21 @@ class Agent:
     async def connect(self) -> None:
         """Connect to the Temporal server."""
         self.client = await Client.connect(self.temporal_address)
+        
+    async def dump(self) -> List[str]:
+        """Dump the current state of the agent workflow."""
+        if not self.client:
+            await self.connect()
+            
+        handle = self.client.get_workflow_handle(self.workflow_id)
+        result = await handle.query(AgentWorkflow.get_model_content)
+        return result
 
     async def prompt(self, prompt: str) -> str:
         """Execute the agent workflow with the given prompt.
 
         Args:
             prompt: Prompt to send to the agent
-            workflow_id: Optional workflow ID to use
 
         Returns:
             The agent's response

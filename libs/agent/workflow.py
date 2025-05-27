@@ -137,3 +137,21 @@ class AgentWorkflow:
         await workflow.wait([self.respond])
         return await self.respond
 
+    @workflow.query
+    def get_model_content(self) -> List[str]:
+        """Query to get only the text content from model responses.
+        
+        Returns:
+            List of text strings from model responses
+        """
+        model_texts = []
+        for content in self.contents:
+            if content.role == "model":
+                for part in content.parts:
+                    try:
+                        if part.text:
+                            model_texts.append(part.text)
+                    except AttributeError:
+                        pass # noop if part is not a text part
+        workflow.logger.info(f'get_model_content: {model_texts}')               
+        return model_texts

@@ -34,7 +34,7 @@ When provided with a query, follow this structured approach:
 	•	Think hard to turn the query into multiple groups of related keywords based on the semantics
 	•	Maximum 3 keywords per group.
 	•	Use the tool available to perform a search without channel filters.
- 	•	Perform Slack search per keyword group.
+	•	Perform Slack search per keyword group.
 	•	Don't quotes the keywords
 	•	Don't use OR operand for searching keywords
 	•	If time ranges are relevant, include them in the search.
@@ -44,9 +44,9 @@ When provided with a query, follow this structured approach:
 
 5. Execute a Second Channel-Based Search Automatically
 	• Research topics related to users and customers should be searched in customer's channels prefixed with support-
- 	•	Think hard to turn the query into multiple groups of related keywords based on the semantics
+	•	Think hard to turn the query into multiple groups of related keywords based on the semantics
 	•	Maximum 3 keywords per group.
-  	•	Perform Slack search per keyword group.
+	•	Perform Slack search per keyword group.
 	•	Use the slack search tool with the refined query and selected channels.
 	•	Don't quotes the keywords
 	•	Don't use OR operand for searching keywords

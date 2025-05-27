@@ -73,7 +73,7 @@ def get_slack_channels(request: GetChannelsRequest) -> List[Dict[str, Any]]:
         channels = response.get("channels", [])
 
         # Log channel information for debugging
-        logger.info(f"Retrieved {len(channels)} channels from Slack workspace")
+        logger.debug(f"Retrieved {len(channels)} channels from Slack workspace")
         for channel in channels:
             logger.debug(f"Channel: #{channel.get('name')} (ID: {channel.get('id')}, "
                         f"Members: {channel.get('num_members', 'N/A')}, "
@@ -87,7 +87,7 @@ def get_slack_channels(request: GetChannelsRequest) -> List[Dict[str, Any]]:
                 "name": channel.get("name"),
             })
 
-        logger.info(f"Returning {len(simplified_channels)} simplified channel records")
+        logger.debug(f"Returning {len(simplified_channels)} simplified channel records")
         return simplified_channels
 
     except SlackApiError as e:
@@ -172,7 +172,7 @@ def search_slack(request: SlackSearchRequest) -> SlackSearchResult | str:
             except ValueError as e:
                 logger.warning(f"Invalid end_time ISO format: {request.end_time}, ignoring time filter")
 
-        logger.info(f"Executing Slack search with query: '{search_query}'")
+        logger.debug(f"Executing Slack search with query: '{search_query}'")
         logger.debug(f"Search parameters - sort: {request.sort}, count: {request.count}")
 
         # Execute the search
@@ -189,7 +189,7 @@ def search_slack(request: SlackSearchRequest) -> SlackSearchResult | str:
         pagination = messages.get("pagination", {})
         has_more = pagination.get("total_count", 0) > len(matches)
 
-        logger.info(f"Search completed - found {total} total results, returning {len(matches)} matches")
+        logger.debug(f"Search completed - found {total} total results, returning {len(matches)} matches")
         logger.debug(f"Results preview: {[match.get('text', '')[:50] + '...' for match in matches[:3]]}")
 
         # Create structured result
@@ -300,7 +300,7 @@ def get_thread_messages(thread_url: str) -> List[Dict[str, Any]]:
         messages = response.get("messages", [])
         
         # Log thread information
-        logger.info(f"Retrieved {len(messages)} messages from thread")
+        logger.debug(f"Retrieved {len(messages)} messages from thread")
         
         # Return simplified message data
         thread_messages = []
@@ -313,7 +313,7 @@ def get_thread_messages(thread_url: str) -> List[Dict[str, Any]]:
                 "reply_users_count": msg.get("reply_users_count", 0)
             })
 
-        logger.info(f"Returning {len(thread_messages)} formatted messages")
+        logger.debug(f"Returning {len(thread_messages)} formatted messages")
         return thread_messages
 
     except SlackApiError as e:
