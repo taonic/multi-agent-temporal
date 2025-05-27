@@ -4,25 +4,24 @@ from typing import Dict, List
 
 from temporalio import activity, workflow
 
+from .tool import create_enhanced_tool
+
 with workflow.unsafe.imports_passed_through():
-    import vertexai
     from asyncio import Future
     from vertexai.generative_models import (
         Content,
-        FunctionDeclaration,
         GenerationConfig,
         GenerativeModel,
         GenerationResponse,
         Part,
-        Candidate,
-        Tool,
+        Candidate
     )
 
 class LLM:
     def __init__(self, model: GenerativeModel, functions: List[callable]) -> None:
         self.model = model
         # convert functions to vertexai tools
-        self.tools = Tool(function_declarations=list(map(FunctionDeclaration.from_func, functions)))
+        self.tools = create_enhanced_tool(functions)
 
     @activity.defn
     def call_llm(self, contents: List[Dict]) -> Dict:
@@ -37,6 +36,8 @@ class LLM:
 
         # Convert dict to Content objects
         vertex_contents = [Content.from_dict(c) for c in contents]
+
+        activity.logger.debug(f'Generates content with toos: {self.tools}')
 
         # Generate response
         return self.model.generate_content(
@@ -80,7 +81,7 @@ class AgentWorkflow:
             raw_rsp = await workflow.execute_activity(
                 LLM.call_llm,
                 dict_content,
-                start_to_close_timeout=timedelta(seconds=10),
+                start_to_close_timeout=timedelta(seconds=60),
             )
 
             candidate = GenerationResponse.from_dict(raw_rsp).candidates[0]
@@ -106,10 +107,11 @@ class AgentWorkflow:
         """Handle function calls from the LLM."""
         parts: List[Part] = []
         for func in candidate.function_calls:
+            arg = func.args
             func_rsp = await workflow.execute_activity(
                 func.name,
-                args=func.args,
-                start_to_close_timeout=timedelta(seconds=10),
+                next(iter(func.args.values()), dict()), # only use the first dataclass typed arg
+                start_to_close_timeout=timedelta(seconds=60),
             )
             response_part = Part.from_function_response(
                 name=func.name,

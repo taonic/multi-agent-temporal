@@ -1,7 +1,8 @@
 import os
 import asyncio
 import uuid
-from typing import List, Optional
+import logging
+from typing import List
 from concurrent.futures import ThreadPoolExecutor
 
 from temporalio import activity, workflow
@@ -93,6 +94,8 @@ class Agent:
             system_instruction=[self.instruction]
         )
         self.llm = LLM(self.model, self.functions)
+
+        logging.basicConfig(level=logging.INFO)  # Change to DEBUG, WARNING, ERROR as needed
 
         # Create a worker that will run in the background during the context
         self.worker = Worker(
