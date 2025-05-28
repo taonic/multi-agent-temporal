@@ -13,15 +13,13 @@ from libs.agent import Agent
 async def poll_agent_thoughts(agent):
     """Poll and display agent's thought process."""
     try:
-        last_dump_length = 0
+        watermark = 0
         while True:
-            dump_result = await agent.dump()
-            if dump_result:
-                new_length = len(dump_result)
-                if new_length > last_dump_length:
-                    for line in dump_result[last_dump_length:]:
-                        await aioconsole.aprint(f'🧠 {line}')
-                    last_dump_length = new_length
+            thoughts = await agent.thoughts(watermark=watermark)
+            if thoughts:
+                for line in thoughts:
+                    await aioconsole.aprint(f'🧠 {line}')
+                watermark += len(thoughts)
             await asyncio.sleep(2)  # Poll every 2 seconds
     except asyncio.CancelledError:
         pass

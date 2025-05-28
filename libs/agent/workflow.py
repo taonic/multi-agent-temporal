@@ -138,11 +138,14 @@ class AgentWorkflow:
         return await self.respond
 
     @workflow.query
-    def get_model_content(self) -> List[str]:
+    def get_model_content(self, watermark: int) -> List[str]:
         """Query to get only the text content from model responses.
         
+        Args:
+            watermark: Index to get content from
+        
         Returns:
-            List of text strings from model responses
+            List of text strings from model responses after watermark index
         """
         model_texts = []
         for content in self.contents:
@@ -153,5 +156,5 @@ class AgentWorkflow:
                             model_texts.append(part.text)
                     except AttributeError:
                         pass # noop if part is not a text part
-        workflow.logger.info(f'get_model_content: {model_texts}')               
-        return model_texts
+        workflow.logger.info(f'get_model_content from watermark {watermark}: {model_texts}')               
+        return model_texts[watermark:]
