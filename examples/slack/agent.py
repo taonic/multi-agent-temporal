@@ -8,7 +8,7 @@ sys.path.append(relative_path)
 
 from examples.slack.tools import get_slack_channels, search_slack, get_thread_messages
 from examples.slack.sys_prompt import get_system_prompt
-from libs.agent import Agent
+from src.agent import Agent
 
 async def poll_agent_thoughts(agent):
     """Poll and display agent's thought process."""
@@ -60,6 +60,7 @@ async def main():
     """Main interactive loop with Slack-enabled agent."""
     try:
         async with Agent(
+            name="Slack Research Agent",
             model_name="models/gemini-2.5-pro-preview-05-06",
             instruction=get_system_prompt(),
             functions=[get_slack_channels, search_slack, get_thread_messages]

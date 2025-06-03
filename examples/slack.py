@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 relative_path = os.path.join(os.path.dirname(__file__), '../')
 sys.path.append(relative_path)
 
-from libs.agent import Agent
+from src.agent import Agent
 
 def get_slack_channels(include_archived: bool = False, include_private: bool = False) -> List[Dict[str, Any]]:
     """Get a list of Slack channels from the workspace.
