@@ -82,7 +82,7 @@ class TestLLM:
         
         tool = manager.llms['root-agent'][1]
         resolved_properties = tool._callable_functions['test_function'].to_dict()['parameters']['properties']
-        assert resolved_properties == {'param': {'type': 'STRING', 'title': 'Param'}}
+        assert resolved_properties == {'param': {'type_': 'STRING', 'title': 'Param'}}
         
         gen_model = manager.llms['sub-agent-1'][0]
         assert gen_model._model_name.endswith(model_name)
@@ -90,7 +90,7 @@ class TestLLM:
 
         tool = manager.llms['sub-agent-1'][1]
         resolved_properties = tool._callable_functions['another_function'].to_dict()['parameters']['properties']
-        assert resolved_properties == {'value': {'type': 'INTEGER', 'title': 'Value'}}
+        assert resolved_properties == {'value': {'type_': 'INTEGER', 'title': 'Value'}}
         
 
     def test_llm_initialization_empty_sub_agents(self, mock_create_enhanced_tool, sample_functions):
