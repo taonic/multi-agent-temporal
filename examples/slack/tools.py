@@ -36,6 +36,19 @@ class SlackSearchResult:
     pagination: Optional[Dict[str, Any]] = None
     has_more: bool = False
 
+@dataclass
+class ThreadInput:
+    """
+    Input object for `get_thread_messages`.
+
+    Attributes
+    ----------
+    thread_url : str
+        Full URL of the Slack thread, e.g.
+        https://your-workspace.slack.com/archives/ABCDEF123/p1717518829123456
+    """
+    thread_url: str
+
 def get_slack_channels(request: GetChannelsRequest) -> List[Dict[str, Any]]:
     """Get a list of Slack channels from the workspace.
 
@@ -256,7 +269,8 @@ def _format_search_results(result: SlackSearchResult) -> str:
 
     return "\n".join(output_lines)
 
-def get_thread_messages(thread_url: str) -> List[Dict[str, Any]]:
+
+def get_thread_messages(params: ThreadInput) -> List[Dict[str, Any]]:
     """Get all messages from a Slack thread given its URL.
     
     Args:
@@ -269,6 +283,8 @@ def get_thread_messages(thread_url: str) -> List[Dict[str, Any]]:
         ValueError: If SLACK_USER_TOKEN environment variable is not set or URL is invalid
         SlackApiError: If the Slack API request fails
     """
+
+    thread_url = params.thread_url 
     # Get API token from environment variable
     slack_token = os.getenv("SLACK_USER_TOKEN")
     if not slack_token:
