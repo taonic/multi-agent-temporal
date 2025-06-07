@@ -1,23 +1,16 @@
 import os
 import asyncio
-import uuid
-import logging
 import inflection
-import json
-from typing import List, Optional, Dict, Any, Union
-from concurrent.futures import ThreadPoolExecutor
 
-from temporalio import activity, workflow
-from temporalio.client import Client
-from temporalio.worker import Worker
+from typing import List, Dict, Any
+
+from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     import vertexai
     from vertexai.generative_models import (
         GenerativeModel,
     )
-
-from .workflow import AgentWorkflow
 
 
 class Agent:
@@ -71,100 +64,3 @@ class Agent:
 
         # Initialize vertexai
         vertexai.init(project=gcp_project, location=region)
-
-        # Convert functions to activities
-        for fn in self.functions:
-            if not hasattr(fn, "__temporal_activity_definition"):
-                activity._Definition._apply_to_callable(fn=fn, activity_name=fn.__name__)
-
-
-    async def connect(self) -> None:
-        """Connect to the Temporal server."""
-        self.client = await Client.connect(self.temporal_address)
-        
-    async def thoughts(self, watermark: int = 0) -> List[str]:
-        """Dump the current state of the agent workflow.
-        
-        Args:
-            watermark: Position to start reading thoughts from
-            
-        Returns:
-            List of thought strings from the workflow
-        """
-        if not self.client:
-            await self.connect()
-            
-        handle = self.client.get_workflow_handle(self.workflow_id)
-        result = await handle.query(AgentWorkflow.get_model_content, watermark)
-        return result
-
-    async def prompt(self, prompt: Union[str, Dict[str, Any]]) -> str:
-        """Execute the agent workflow with the given prompt.
-
-        Args:
-            prompt: Prompt to send to the agent, either as a string or a structured input
-                   matching the input_schema if defined
-
-        Returns:
-            The agent's response
-        """
-        if not self.client:
-            await self.connect()
-
-        handle = self.client.get_workflow_handle(self.workflow_id)
-        result = await handle.execute_update(AgentWorkflow.prompt, prompt)
-        return result
-
-    async def __aenter__(self):
-        """Enter the async context manager."""
-        await self.connect()
-        
-        sub_agents = {a.name.lower().replace(" ", "_").replace("-", "_"): a.input_schema for a in self.sub_agents}
-        
-        self.model = GenerativeModel(
-            self.model_name,
-            system_instruction=[self.instruction]
-        )
-        
-        self.llm = LLM(model=self.model, sub_agents=sub_agents, functions=self.functions)
-
-        logging.basicConfig(level=logging.INFO)  # Change to DEBUG, WARNING, ERROR as needed
-
-        # Create a worker that will run in the background during the context
-        self.worker = Worker(
-            self.client,
-            task_queue=self.task_queue,
-            workflows=[AgentWorkflow],
-            activities=self.functions + [self.llm.call_llm],
-            activity_executor=ThreadPoolExecutor(100),
-        )
-
-        # Start worker as background task
-        self.worker_task = asyncio.create_task(self.worker.run())
-        self.workflow_id = str(uuid.uuid4())
-
-        # Execute the workflow with model info
-        await self.client.start_workflow(
-            AgentWorkflow.run,
-            args=("", sub_agents.keys()),
-            id=self.workflow_id,
-            task_queue=self.task_queue,
-        )
-
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Exit the async context manager."""
-        # end the workflow
-        await self.prompt("END")
-
-        if self.worker_task:
-            self.worker_task.cancel()
-            try:
-                await self.worker_task
-            except asyncio.CancelledError:
-                pass
-
-        # Clean up any other resources
-        self.worker = None
-        self.client = None

@@ -5,9 +5,8 @@ from dataclasses import dataclass
 @dataclass
 class ChannelSchema:
     """Schema for channel exploration queries."""
-    name_pattern: str
-    topic_pattern: Optional[str] = None
-    limit: Optional[int] = None
+    include_archived: bool = False
+    #include_private: bool = False
 
 @dataclass
 class SearchSchema:

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class GetChannelsRequest:
     """Request parameters for getting Slack channels"""
     include_archived: bool = False
-    include_private: bool = False
+    #include_private: bool = False
 
 @dataclass
 class SlackSearchRequest:

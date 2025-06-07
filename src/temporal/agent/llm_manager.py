@@ -4,6 +4,7 @@ from temporalio import activity
 from vertexai.generative_models import GenerativeModel, Content, GenerationConfig, Tool
 from .tool import create_enhanced_tool
 from .agent import Agent
+import logging
 
 @dataclass
 class LLMCallInput:
@@ -35,6 +36,8 @@ class LLMManager:
             functions=agent.functions,
             sub_agents={a.name: a.input_schema for a in agent.sub_agents}
         )
+        logging.debug("tool: %s", tool)
+        
         model = GenerativeModel(
             agent.model_name,
             system_instruction=agent.instruction

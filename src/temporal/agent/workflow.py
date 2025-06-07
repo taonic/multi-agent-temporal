@@ -1,8 +1,10 @@
 import asyncio
+import json
 from datetime import timedelta
 from typing import List, Dict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from temporalio import workflow
+
 
 from temporal.agent.llm_manager import LLMCallInput
 
@@ -19,9 +21,10 @@ with workflow.unsafe.imports_passed_through():
 class AgentWorkflowInput:
     """Input for the agent workflow."""
     agent_name: str
-    agent_tree: Dict[str, any] = None
+    sub_agents: Dict = None
     prompt: str = ""
-    contents: List[Content] = None
+    contents: List[Dict] = field(default_factory=list)
+    is_root_agent: bool = False
 
 @workflow.defn
 class AgentWorkflow:
@@ -33,9 +36,10 @@ class AgentWorkflow:
         self.terminate: bool = False
         self.agent_name: str
         self.sub_agents: Dict[any] = None
+        self.is_root_agent: bool = False
 
     @workflow.run
-    async def run(self, agent_input: AgentWorkflowInput) -> str:
+    async def run(self, agent_input: AgentWorkflowInput) -> List[Dict]:
         """Run the workflow with the given prompt.
 
         Args:
@@ -46,8 +50,10 @@ class AgentWorkflow:
         """
         
         self.agent_name = agent_input.agent_name
-        self.contents = agent_input.contents if agent_input.contents else []
-        self.sub_agents = agent_input.agent_tree.get(self.agent_name, {})
+        self.contents = [Content.from_dict(c) for c in agent_input.contents]
+        self.contents_start = len(self.contents)
+        self.sub_agents = agent_input.sub_agents[self.agent_name]
+        self.is_root_agent = agent_input.is_root_agent
         
         prompt = agent_input.prompt
         if prompt == "":
@@ -63,10 +69,15 @@ class AgentWorkflow:
             if candidate.function_calls:
                 await self._handle_function_calls(candidate)
             elif candidate.finish_reason == 1:
-                # respond message by resolving the future
-                if self.pending_respond:
-                    self.pending_respond.set_result(candidate.content.text)
-                await self._wait_for_prompt()
+                if self.is_root_agent:
+                    # root agent respond message by resolving the future
+                    if self.pending_respond:
+                        self.pending_respond.set_result(candidate.content.text)
+                    await self._wait_for_prompt()
+                else:
+                    # sub-agent respond the new contents collected in the sub-agent
+                    return [c.to_dict() for c in self.contents[self.contents_start:]]
+
 
         if self.pending_respond:
             self.pending_respond.set_result("")
@@ -94,18 +105,20 @@ class AgentWorkflow:
 
         parts: List[Part] = []
         for func in candidate.function_calls:
+            workflow.logger.debug(f"Handling function call: {func}")
             func_name = func.name
-            func_args = next(iter(func.args.values()), dict())
             if func_name in self.sub_agents.keys():
+                prompt = json.dumps(func.args) # not sure if this is the right way to do it
                 sub_agent_input = AgentWorkflowInput(
                     agent_name=func_name,
-                    agent_tree=self.sub_agents[func_name],
-                    contents=self.contents,
+                    sub_agents=self.sub_agents[func_name],
+                    prompt=prompt,
+                    contents=[c.to_dict() for c in self.contents]
                 )
                 func_rsp = await workflow.execute_child_workflow(
                     AgentWorkflow.run,
                     sub_agent_input,
-                    id=f"{self.agent_name}-workflow",
+                    id=f"{workflow.info().workflow_id}-{self.agent_name}-workflow",
                     task_queue="agent-task-queue",
                 )
                 response_part = Part.from_function_response(
@@ -114,9 +127,11 @@ class AgentWorkflow:
                 )
                 parts.append(response_part)
             else:
+                func_args = next(iter(func.args.values()), dict()), # only use the first dataclass typed arg,
+                workflow.logger.debug(f"Calling function: {func_name} with args: {func_args}")
                 func_rsp = await workflow.execute_activity(
                     func_name,
-                    func_args,
+                    args=func_args,
                     start_to_close_timeout=timedelta(seconds=60),
                 )
                 response_part = Part.from_function_response(
