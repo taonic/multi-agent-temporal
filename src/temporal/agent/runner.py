@@ -1,25 +1,37 @@
 import asyncio
 import uuid
 import logging
+import os
 from typing import List, Dict, Union, Any
 from concurrent.futures import ThreadPoolExecutor
 
 from temporalio.client import Client
 from temporalio.worker import Worker
-from temporalio import activity
+from temporalio import activity, workflow
 
-from temporal.agent import Agent
-from temporal.agent.llm_manager import LLMManager
-from temporal.agent.workflow import AgentWorkflow, AgentWorkflowInput
-
+with workflow.unsafe.imports_passed_through():
+    import vertexai
+    from temporal.agent import Agent
+    from temporal.agent.llm_manager import LLMManager
+    from temporal.agent.workflow import AgentWorkflow, AgentWorkflowInput
 
 class Runner:
     """Runner class to execute the agent in an application context."""
-    def __init__(self, app_name: str, agent: Agent, temporal_address: str = "localhost:7233"):
+    def __init__(
+        self,
+        app_name: str,
+        agent: Agent,
+        region: str = "us-central1",
+        temporal_address: str = "localhost:7233",
+        task_queue: str = "agent-task-queue"
+    ):
         self.app_name = app_name
         self.agent = agent
-        self.task_queue = "agent-task-queue"
+        self.region = region
         self.temporal_address = temporal_address
+        self.task_queue = task_queue
+        self.gcp_project = os.getenv("GCP_PROJECT_ID")
+        
         self.client = None
         self.worker = None
         self.worker_task = None
@@ -87,6 +99,9 @@ class Runner:
     async def __aenter__(self):
         """Enter the async context manager."""
         await self._connect()
+        
+        # Initialize vertexai
+        vertexai.init(project=self.gcp_project, location=self.region)
         
         llm_manager = LLMManager(self.agent)
 
