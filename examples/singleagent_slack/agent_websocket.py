@@ -1,18 +1,14 @@
-import sys
 import os
 import re
 import asyncio
-import aioconsole
 
 from slack_bolt.async_app import AsyncApp
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 
-relative_path = os.path.join(os.path.dirname(__file__), '../../')
-sys.path.append(relative_path)
+from temporal.agent import Agent, Runner
 
-from examples.slack.tools import get_slack_channels, search_slack, get_thread_messages
-from examples.slack.sys_prompt import get_system_prompt
-from libs.agent import Agent
+from .tools import get_slack_channels, search_slack, get_thread_messages
+from .sys_prompt import get_system_prompt
 
 
 # Stream agent thoughts back to slack
@@ -34,12 +30,15 @@ async def main():
     app_token  = os.environ["SLACK_APP_TOKEN"]
 
     # Initialise the LLM-powered agent
-    async with Agent(
+    agent = Agent(
+        name="Slack Research Agent",
         model_name="models/gemini-2.5-pro-preview-05-06",
         instruction=get_system_prompt(),
         functions=[get_slack_channels, search_slack, get_thread_messages],
-    ) as agent:
-        slack_app = AsyncApp(token=bot_token)  
+    )
+
+    async with Runner(app_name="slack_agent", agent=agent) as runner:
+        slack_app = AsyncApp(token=bot_token)
 
         # Handle mentions
         @slack_app.event("app_mention")
@@ -59,7 +58,7 @@ async def main():
             thoughts_task = asyncio.create_task(_poll_thoughts_to_slack(agent, say))
 
             try:
-                response = await agent.prompt(user_text)
+                response = await runner.prompt(user_text)
                 await say(f"🤖 {response}")
             finally:
                 thoughts_task.cancel()
@@ -67,10 +66,11 @@ async def main():
         # Handle direct messages
         @slack_app.event("message")           
         async def handle_dm(event, say):
+            print(event)
             if event.get("channel_type") != "im":      
                 return
             if event.get("subtype") or event.get("bot_id"):
-                return                             
+                return
 
             text = (event.get("text") or "").strip()
             if not text:
@@ -79,7 +79,7 @@ async def main():
             await say("🤔 Thinking…")
             poll = asyncio.create_task(_poll_thoughts_to_slack(agent, say))
             try:
-                reply = await agent.prompt(text)
+                reply = await runner.prompt(text)
                 await say(f"🤖 {reply}")
             finally:
                 poll.cancel()

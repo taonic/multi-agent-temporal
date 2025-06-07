@@ -15,7 +15,8 @@ def get_order_status(order_id: str):
 
 async def main():
     agent = Agent(
-        name="gemini-2.0-flash",
+        name="Store Support Agent",
+        model_name="gemini-2.0-flash",
         instruction="You are a store support API assistant to help with online orders.",
         functions = [greet, get_order_status]
     )
