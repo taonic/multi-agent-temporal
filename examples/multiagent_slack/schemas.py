@@ -14,3 +14,8 @@ class SearchSchema:
     channel: Optional[str] = None
     time_range: Optional[str] = None
     limit: Optional[int] = None
+    
+@dataclass
+class ThreadSchema:
+    """Schema for thread summarization."""
+    thread_url: str

@@ -60,8 +60,6 @@ def get_slack_channels(request: GetChannelsRequest) -> List[Dict[str, Any]]:
     try:
         # Determine channel types to include
         channel_types = ["public_channel"]
-        if request.include_private:
-            channel_types.append("private_channel")
 
         # Make the API request
         response = client.conversations_list(
