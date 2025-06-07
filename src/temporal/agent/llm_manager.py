@@ -1,10 +1,12 @@
+import logging
 from typing import Dict, List, Tuple
 from dataclasses import dataclass
+
 from temporalio import activity
 from vertexai.generative_models import GenerativeModel, Content, GenerationConfig, Tool
-from .tool import create_enhanced_tool
+
+from .tools_util import create_enhanced_tool
 from .agent import Agent
-import logging
 
 @dataclass
 class LLMCallInput:
@@ -48,14 +50,14 @@ class LLMManager:
             self._build_llms(sub_agent)
 
     @activity.defn
-    def call_llm(self, input: LLMCallInput) -> Dict:
+    def call_llm(self, call_input: LLMCallInput) -> Dict:
         """Activity to call the LLM with the given input."""
         
-        model = self.llms[input.agent_name][0]
-        tool = self.llms[input.agent_name][1]
+        model = self.llms[call_input.agent_name][0]
+        tool = self.llms[call_input.agent_name][1]
 
         # Convert dict to Content objects
-        vertex_contents = [Content.from_dict(c) for c in input.contents]
+        vertex_contents = [Content.from_dict(c) for c in call_input.contents]
 
         activity.logger.debug(f'Generates content with tool: {tool}')
 

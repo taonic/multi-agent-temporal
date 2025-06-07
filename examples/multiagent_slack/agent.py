@@ -7,7 +7,7 @@ from temporal.agent.console import AgentConsole
 
 from .tools import get_slack_channels, search_slack, get_thread_messages
 from .sys_prompt import get_system_prompt
-from .schemas import ChannelSchema, SearchSchema, ThreadSchema
+from .schemas import ChannelSchema, SearchSchema
 
 async def main():
     """Main interactive loop with Slack-enabled agent."""

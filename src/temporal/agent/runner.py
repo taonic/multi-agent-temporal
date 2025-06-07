@@ -2,15 +2,15 @@ import asyncio
 import uuid
 import logging
 from typing import List, Dict, Union, Any
+from concurrent.futures import ThreadPoolExecutor
+
 from temporalio.client import Client
 from temporalio.worker import Worker
-from concurrent.futures import ThreadPoolExecutor
 from temporalio import activity
 
 from temporal.agent import Agent
 from temporal.agent.llm_manager import LLMManager
-from temporal.agent.workflow import AgentWorkflow
-from temporal.agent.workflow import AgentWorkflowInput
+from temporal.agent.workflow import AgentWorkflow, AgentWorkflowInput
 
 
 class Runner:
@@ -24,9 +24,9 @@ class Runner:
         self.worker = None
         self.worker_task = None
         self.workflow_id = None
-        self.functions = self._process_functions(agent)
-        logging.debug(f'functions: {self.functions}')
-        self.agent_tree = self._agent_tree(agent)
+        self.activities = self._functions_to_activities(agent)
+        self.agent_hierarchy = self._agent_hierarchy(agent)
+        logging.debug('agent_hierarchy: %s, activities: %s', self.agent_hierarchy, self.activities)
         
     async def thoughts(self, watermark: int = 0) -> List[str]:
         """Dump the current state of the agent workflow.
@@ -62,25 +62,21 @@ class Runner:
         return result
 
         
-    def _agent_tree(self, agent: Agent) -> Dict:
+    def _agent_hierarchy(self, agent: Agent) -> Dict:
         """Generate a tree representation of the agent and its sub-agents."""
-        tree = {
-            agent.name: {sub_agent.name: self._agent_tree(sub_agent) for sub_agent in agent.sub_agents}
-        }
-
-        return tree
+        return { sub_agent.name: self._agent_hierarchy(sub_agent) for sub_agent in agent.sub_agents }
         
-    def _process_functions(self, agent: Agent) -> List[callable]:
+    def _functions_to_activities(self, agent: Agent) -> List[callable]:
         """Process the agent's functions and return them as a list."""
         functions = []
 
         for fn in agent.functions:
             if not hasattr(fn, "__temporal_activity_definition"):
-                activity._Definition._apply_to_callable(fn=fn, activity_name=fn.__name__)
+                activity.defn(fn)
             functions.append(fn)
 
         for sub_agent in agent.sub_agents:
-            functions.extend(self._process_functions(sub_agent))
+            functions.extend(self._functions_to_activities(sub_agent))
 
         return functions
         
@@ -99,7 +95,7 @@ class Runner:
             self.client,
             task_queue=self.task_queue,
             workflows=[AgentWorkflow],
-            activities=self.functions + [llm_manager.call_llm],
+            activities=self.activities + [llm_manager.call_llm],
             activity_executor=ThreadPoolExecutor(100),
         )
 
@@ -110,7 +106,7 @@ class Runner:
         # Execute the workflow with model info
         await self.client.start_workflow(
             AgentWorkflow.run,
-            AgentWorkflowInput(agent_name=self.agent.name, sub_agents=self.agent_tree, is_root_agent=True),
+            AgentWorkflowInput(agent_name=self.agent.name, sub_agents=self.agent_hierarchy, is_root_agent=True),
             id=self.workflow_id,
             task_queue=self.task_queue,
         )

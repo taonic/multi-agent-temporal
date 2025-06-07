@@ -1,6 +1,6 @@
 import inspect
 from dataclasses import fields, is_dataclass
-from typing import get_type_hints, get_origin, get_args, Union, List, Dict, Any, Optional
+from typing import get_type_hints, get_origin, get_args, Union, List, Dict, Any
 from vertexai.generative_models import FunctionDeclaration, Tool
 
 def create_function_declaration_with_dataclass_support(func: callable) -> FunctionDeclaration:

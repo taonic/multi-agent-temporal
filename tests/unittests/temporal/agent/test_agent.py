@@ -49,7 +49,7 @@ class TestLLM:
     @pytest.fixture
     def mock_create_enhanced_tool(self):
         """Mock create_enhanced_tool function."""
-        with patch('temporal.agent.llm.create_enhanced_tool') as mock_tool:
+        with patch('temporal.agent.llm_manager.create_enhanced_tool') as mock_tool:
             mock_tool.return_value = Mock()
             yield mock_tool
 

@@ -14,7 +14,8 @@ with workflow.unsafe.imports_passed_through():
         Content,
         GenerationResponse,
         Part,
-        Candidate
+        Candidate,
+        FunctionCall
     )
     
 @dataclass
@@ -32,6 +33,7 @@ class AgentWorkflow:
 
     def __init__(self) -> None:
         self.contents: List[Content] = []
+        self.contents_starts_at: int = 0
         self.pending_respond: Future = None
         self.terminate: bool = False
         self.agent_name: str
@@ -51,8 +53,8 @@ class AgentWorkflow:
         
         self.agent_name = agent_input.agent_name
         self.contents = [Content.from_dict(c) for c in agent_input.contents]
-        self.contents_start = len(self.contents)
-        self.sub_agents = agent_input.sub_agents[self.agent_name]
+        self.contents_starts_at = len(self.contents)
+        self.sub_agents = agent_input.sub_agents
         self.is_root_agent = agent_input.is_root_agent
         
         prompt = agent_input.prompt
@@ -64,6 +66,7 @@ class AgentWorkflow:
                 parts=[Part.from_text(prompt)],
             )
             self.contents.append(user_prompt_content)
+
         while not self.terminate:
             candidate = await self._call_llm()
             if candidate.function_calls:
@@ -76,7 +79,7 @@ class AgentWorkflow:
                     await self._wait_for_prompt()
                 else:
                     # sub-agent respond the new contents collected in the sub-agent
-                    return [c.to_dict() for c in self.contents[self.contents_start:]]
+                    return [c.to_dict() for c in self.contents[self.contents_starts_at:]]
 
 
         if self.pending_respond:
@@ -106,40 +109,48 @@ class AgentWorkflow:
         parts: List[Part] = []
         for func in candidate.function_calls:
             workflow.logger.debug(f"Handling function call: {func}")
-            func_name = func.name
-            if func_name in self.sub_agents.keys():
-                prompt = json.dumps(func.args) # not sure if this is the right way to do it
-                sub_agent_input = AgentWorkflowInput(
-                    agent_name=func_name,
-                    sub_agents=self.sub_agents[func_name],
-                    prompt=prompt,
-                    contents=[c.to_dict() for c in self.contents]
-                )
-                func_rsp = await workflow.execute_child_workflow(
-                    AgentWorkflow.run,
-                    sub_agent_input,
-                    id=f"{workflow.info().workflow_id}-{self.agent_name}-workflow",
-                    task_queue="agent-task-queue",
-                )
-                response_part = Part.from_function_response(
-                    name=func.name,
-                    response={"content": func_rsp},
-                )
-                parts.append(response_part)
+            response_part: Part
+            
+            if func.name in self.sub_agents.keys():
+                response_part = await self._invoke_as_child_workflow(func)
             else:
-                func_args = next(iter(func.args.values()), dict()), # only use the first dataclass typed arg,
-                workflow.logger.debug(f"Calling function: {func_name} with args: {func_args}")
-                func_rsp = await workflow.execute_activity(
-                    func_name,
-                    args=func_args,
-                    start_to_close_timeout=timedelta(seconds=60),
-                )
-                response_part = Part.from_function_response(
-                    name=func.name,
-                    response={"content": func_rsp},
-                )
-                parts.append(response_part)
+                response_part = await self._invoke_as_activity(func)
+            parts.append(response_part)
+
         self.contents.append(Content(role="user", parts=parts))
+        
+    async def _invoke_as_child_workflow(self, func: FunctionCall) -> None:
+        prompt = json.dumps(func.args) # not sure if this is the right way to do it
+        sub_agent_input = AgentWorkflowInput(
+            agent_name=func.name,
+            sub_agents=self.sub_agents[func.name],
+            prompt=prompt,
+            contents=[c.to_dict() for c in self.contents]
+        )
+        func_rsp = await workflow.execute_child_workflow(
+            AgentWorkflow.run,
+            sub_agent_input,
+            id=f"{workflow.info().workflow_id}-{self.agent_name}-workflow",
+            task_queue="agent-task-queue",
+        )
+        
+        return Part.from_function_response(
+            name=func.name,
+            response={"content": func_rsp},
+        )
+        
+    async def _invoke_as_activity(self, func: FunctionCall) -> None:
+        func_args = next(iter(func.args.values()), dict()), # only use the first dataclass typed arg,
+        workflow.logger.debug(f"Calling function: {func.name} with args: {func_args}")
+        func_rsp = await workflow.execute_activity(
+            func.name,
+            args=func_args,
+            start_to_close_timeout=timedelta(seconds=60),
+        )
+        return Part.from_function_response(
+            name=func.name,
+            response={"content": func_rsp},
+        )
 
     @workflow.update
     async def prompt(self, prompt: str) -> str:
