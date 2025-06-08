@@ -74,12 +74,7 @@ def get_slack_channels(request: GetChannelsRequest) -> List[Dict[str, Any]]:
 
         # Log channel information for debugging
         logger.debug(f"Retrieved {len(channels)} channels from Slack workspace")
-        for channel in channels:
-            logger.debug(f"Channel: #{channel.get('name')} (ID: {channel.get('id')}, "
-                        f"Members: {channel.get('num_members', 'N/A')}, "
-                        f"Private: {channel.get('is_private', False)}, "
-                        f"Archived: {channel.get('is_archived', False)})")
-
+        
         # Return simplified channel data
         simplified_channels = []
         for channel in channels:

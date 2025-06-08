@@ -15,7 +15,8 @@ with workflow.unsafe.imports_passed_through():
         GenerationResponse,
         Part,
         Candidate,
-        FunctionCall
+        FunctionCall,
+        FinishReason
     )
     
 @dataclass
@@ -32,13 +33,14 @@ class AgentWorkflow:
     """Workflow that manages the conversation with the LLM."""
 
     def __init__(self) -> None:
+        self.agent_name: str
+        self.is_root_agent: bool = False
+        self.sub_agents: Dict[any] = None
         self.contents: List[Content] = []
         self.contents_starts_at: int = 0
         self.pending_respond: Future = None
         self.terminate: bool = False
-        self.agent_name: str
-        self.sub_agents: Dict[any] = None
-        self.is_root_agent: bool = False
+        self.model_contents: Dict[str, List[str]] = {} # Stores agent and sub-agent's model contents
 
     @workflow.run
     async def run(self, agent_input: AgentWorkflowInput) -> List[Dict]:
@@ -54,9 +56,11 @@ class AgentWorkflow:
         self.agent_name = agent_input.agent_name
         self.contents = [Content.from_dict(c) for c in agent_input.contents]
         self.contents_starts_at = len(self.contents)
+        self.model_contents[self.agent_name] = []
         self.sub_agents = agent_input.sub_agents
         self.is_root_agent = agent_input.is_root_agent
         
+        # handle prompt
         prompt = agent_input.prompt
         if prompt == "":
             await self._wait_for_prompt()
@@ -67,24 +71,48 @@ class AgentWorkflow:
             )
             self.contents.append(user_prompt_content)
 
+        # main loop to handle LLM responses
         while not self.terminate:
             candidate = await self._call_llm()
+            await self._store_content(candidate.content)
             if candidate.function_calls:
                 await self._handle_function_calls(candidate)
-            elif candidate.finish_reason == 1:
+            elif candidate.finish_reason == FinishReason.STOP:
                 if self.is_root_agent:
-                    # root agent respond message by resolving the future
+                    # root agent respond the final response then wait for the next prompt
                     if self.pending_respond:
                         self.pending_respond.set_result(candidate.content.text)
-                    await self._wait_for_prompt()
+                        await self._wait_for_prompt()
                 else:
                     # sub-agent respond the new contents collected in the sub-agent
                     return [c.to_dict() for c in self.contents[self.contents_starts_at:]]
 
-
         if self.pending_respond:
             self.pending_respond.set_result("")
-
+            
+    async def _store_content(self, content: Content) -> None:
+        """Store and propagate the content from the LLM."""
+        self.contents.append(content)
+        # store model contents separately for querying
+        if content.role == "model":
+            for part in content.parts:
+                try:
+                    if part.text:
+                        self.model_contents[self.agent_name].append(part.text)
+                        # propagate model content to the parent workflow
+                        await self._propagate_model_content(part.text)
+                except AttributeError:
+                    pass # noop if part is not a text part
+    
+    async def _propagate_model_content(self, message) -> None:
+        """ Propagate model contents to the parent workflow."""
+        if self.is_root_agent:
+            return
+        parent_info = workflow.info().parent
+        if parent_info:
+            handle = workflow.get_external_workflow_handle(parent_info.workflow_id)
+            await handle.signal(AgentWorkflow.add_model_content, message)
+    
     async def _call_llm(self) -> Candidate:
         dict_content = [c.to_dict() for c in self.contents]
         llm_input = LLMCallInput(
@@ -104,8 +132,6 @@ class AgentWorkflow:
 
     async def _handle_function_calls(self, candidate: Candidate) -> None:
         """Handle function calls from the LLM."""
-        self.contents.append(candidate.content)
-
         parts: List[Part] = []
         for func in candidate.function_calls:
             workflow.logger.debug(f"Handling function call: {func}")
@@ -127,10 +153,11 @@ class AgentWorkflow:
             prompt=prompt,
             contents=[c.to_dict() for c in self.contents]
         )
+        child_id = f"{workflow.info().workflow_id}-{self.agent_name}-workflow"
         func_rsp = await workflow.execute_child_workflow(
             AgentWorkflow.run,
             sub_agent_input,
-            id=f"{workflow.info().workflow_id}-{self.agent_name}-workflow",
+            id=child_id,
             task_queue="agent-task-queue",
         )
         
@@ -154,6 +181,7 @@ class AgentWorkflow:
 
     @workflow.update
     async def prompt(self, prompt: str) -> str:
+        """Update the workflow with a new prompt."""
         workflow.logger.debug(f'prompt received: {prompt}')
         if prompt == "END":
             self.terminate = True
@@ -170,23 +198,11 @@ class AgentWorkflow:
         return await self.pending_respond
 
     @workflow.query
-    def get_model_content(self, watermark: int) -> List[str]:
-        """Query to get only the text content from model responses.
-        
-        Args:
-            watermark: Index to get content from
-        
-        Returns:
-            List of text strings from model responses after watermark index
-        """
-        model_texts = []
-        for content in self.contents:
-            if content.role == "model":
-                for part in content.parts:
-                    try:
-                        if part.text:
-                            model_texts.append(part.text)
-                    except AttributeError:
-                        pass # noop if part is not a text part
-        workflow.logger.info(f'get_model_content from watermark {watermark}: {model_texts}')               
-        return model_texts[watermark:]
+    async def get_model_content(self, watermark: int) -> List[str]:
+        """Get the model's content."""
+        return self.model_contents[self.agent_name][watermark:]
+    
+    @workflow.signal
+    async def add_model_content(self, message: str) -> None:
+        """Signal to update the model's content."""
+        self.model_contents[self.agent_name].append(message)

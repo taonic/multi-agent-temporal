@@ -33,7 +33,7 @@ class AgentConsole:
                 thoughts = await self.runner.thoughts(watermark=watermark)
                 if thoughts:
                     for line in thoughts:
-                        await aioconsole.aprint(f'🧠 {line}')
+                        await aioconsole.aprint(f'🤖 {line}')
                     watermark += len(thoughts)
                 await asyncio.sleep(2)  # Poll every 2 seconds
         except asyncio.CancelledError:
@@ -47,22 +47,13 @@ class AgentConsole:
         if user_input.lower() in ["exit", "quit", "bye"]:
             return "exit"
             
-        print("🤔 Agent is thinking...")
+        print("🤖 Agent is thinking...")
         
         # Start polling task to monitor agent's thoughts
         polling_task = asyncio.create_task(self._poll_agent_thoughts())
         
         try:
-            # Check if input is structured JSON
-            if user_input.strip().startswith('{') and user_input.strip().endswith('}'):
-                try:
-                    structured_input = json.loads(user_input)
-                    result = await self.runner.prompt(structured_input)
-                except json.JSONDecodeError:
-                    result = await self.runner.prompt(user_input)
-            else:
-                result = await self.runner.prompt(user_input)
-                
+            result = await self.runner.prompt(user_input)
             await aioconsole.aprint(f"🤖 Agent: {result}\n")
         finally:
             # Always cancel the polling task when done
