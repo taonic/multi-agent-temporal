@@ -1,5 +1,5 @@
 import asyncio
-import uuid
+import secrets
 import logging
 import os
 from typing import List, Dict, Union, Any
@@ -16,7 +16,13 @@ with workflow.unsafe.imports_passed_through():
     from temporal.agent.workflow import AgentWorkflow, AgentWorkflowInput
 
 class Runner:
-    """Runner class to execute the agent in an application context."""
+    """
+    Runner for executing agent workflows in Temporal.
+    This class manages the connection to the Temporal server, starts the worker,
+    and provides methods to interact with the agent workflow.
+    It supports asynchronous context management to ensure proper resource cleanup.
+    """
+
     def __init__(
         self,
         app_name: str,
@@ -41,7 +47,7 @@ class Runner:
         logging.debug('agent_hierarchy: %s, activities: %s', self.agent_hierarchy, self.activities)
         
     async def thoughts(self, watermark: int = 0) -> List[str]:
-        """Dump the current state of the agent workflow.
+        """Dump the model responses from the workflow.
         
         Args:
             watermark: Position to start reading thoughts from
@@ -116,7 +122,7 @@ class Runner:
 
         # Start worker as background task
         self.worker_task = asyncio.create_task(self.worker.run())
-        self.workflow_id = str(uuid.uuid4())
+        self.workflow_id = f'{self.app_name}-{secrets.token_hex(3)}'
 
         # Execute the workflow with model info
         await self.client.start_workflow(

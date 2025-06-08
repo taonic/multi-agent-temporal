@@ -1,10 +1,10 @@
 import asyncio
 import json
+import secrets
 from datetime import timedelta
 from typing import List, Dict
 from dataclasses import dataclass, field
 from temporalio import workflow
-
 
 from temporal.agent.llm_manager import LLMCallInput
 
@@ -30,7 +30,11 @@ class AgentWorkflowInput:
 
 @workflow.defn
 class AgentWorkflow:
-    """Workflow that manages the conversation with the LLM."""
+    """
+    Workflow that manages the conversation with the LLM.
+    It handles the user's prompt and response (Update), LLM calls (Activity), and function calls (Activity).
+    It also manages sub-agents and propagate model contents (Signal).
+    """
 
     def __init__(self) -> None:
         self.agent_name: str
@@ -74,6 +78,15 @@ class AgentWorkflow:
         # main loop to handle LLM responses
         while not self.terminate:
             candidate = await self._call_llm()
+            if candidate.finish_reason == FinishReason.MALFORMED_FUNCTION_CALL:
+                # handle malformed function call with a user prompt
+                user_prompt_content = Content(
+                    role="user",
+                    parts=[Part.from_text(candidate.finish_message)],
+                )
+                self.contents.append(user_prompt_content)
+                continue
+                
             await self._store_content(candidate.content)
             if candidate.function_calls:
                 await self._handle_function_calls(candidate)
@@ -153,7 +166,7 @@ class AgentWorkflow:
             prompt=prompt,
             contents=[c.to_dict() for c in self.contents]
         )
-        child_id = f"{workflow.info().workflow_id}-{self.agent_name}-workflow"
+        child_id = f"{workflow.info().workflow_id}/{func.name}-{secrets.token_hex(3)}"
         func_rsp = await workflow.execute_child_workflow(
             AgentWorkflow.run,
             sub_agent_input,

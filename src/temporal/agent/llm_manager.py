@@ -15,9 +15,11 @@ class LLMCallInput:
     contents: List[Dict]
 
 class LLMManager:
-    """Manager for LLMs and tools.
+    """Manager for LLMs and tools to facilitate Temporal Activity calls.
+    It builds a dictionary of agent names and their associated tools from the provided agent structure.
 
     Attributes:
+        agent: The root Agent instance containing the model and tools
         llms: Dictionary of LLMs and tools
     """
 
@@ -38,11 +40,11 @@ class LLMManager:
             functions=agent.functions,
             sub_agents={a.name: a.input_schema for a in agent.sub_agents}
         )
-        logging.debug("tool: %s", tool)
+        logging.debug(f'Creating tool for agent: {agent.name} with functions: {agent.functions} and sub_agents: {agent.sub_agents}')
         
         model = GenerativeModel(
             agent.model_name,
-            system_instruction=agent.instruction
+            system_instruction=agent.instruction,
         )
         self.llms[agent.name] = [model, tool]
         

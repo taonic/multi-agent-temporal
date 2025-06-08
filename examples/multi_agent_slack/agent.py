@@ -19,7 +19,7 @@ async def main():
         functions=[get_slack_channels],
         input_schema=ChannelSchema
     )
-
+    
     search_agent = Agent(
         name="Search Specialist",
         model_name="models/gemini-2.5-pro-preview-05-06",
@@ -27,7 +27,7 @@ async def main():
         functions=[search_slack],
         input_schema=SearchSchema
     )
-
+    
     thread_summary_agent = Agent(
         name="Thread Specialist",
         model_name="models/gemini-2.5-pro-preview-05-06",
@@ -42,6 +42,7 @@ async def main():
         instruction=get_system_prompt(),
         sub_agents=[channel_agent, search_agent, thread_summary_agent]
     )
+
 
     message = """
         🤖 Slack-enabled Agent started!
