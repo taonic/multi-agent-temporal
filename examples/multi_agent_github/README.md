@@ -19,7 +19,6 @@ This example creates a system of specialized agents that work together to help u
 - Answer technical questions like:
   - "How does Temporal implement rate limiting on the server side?"
   - "How does Temporal's Go SDK implement workflow sleep?"
-  - "What's the architecture of Kubernetes' scheduler?"
 
 ## Setup Instructions
 
@@ -28,9 +27,8 @@ This example creates a system of specialized agents that work together to help u
 For higher API rate limits, set up a GitHub Personal Access Token:
 
 1. Go to [GitHub Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens)
-2. Generate a new token (classic) with `public_repo` and `read:org` scope
-3. Authorize the Github org, e.g. temporalio to increase Github's API rate limit quota
-4. Set the environment variable:
+2. Generate a new fine-grained personal access tokens: https://github.com/settings/personal-access-tokens (Only public repositories is required)
+3. Set the environment variable:
 
 ```bash
 export GITHUB_TOKEN=your_github_token_here
@@ -80,35 +78,13 @@ Here are some example questions you can ask:
 - "What's the architecture of Temporal's worker polling mechanism?"
 - "How does Temporal handle workflow state persistence?"
 
-### General Technical Questions
-- "How is distributed consensus implemented in etcd?"
-- "What's the architecture of Kubernetes' scheduler?"
-- "How does Docker handle container isolation?"
-- "How does Prometheus implement time series storage?"
-
 ### Language-specific Searches
 - "Show me rate limiting implementations in Go"
 - "Find circuit breaker patterns in Java"
 - "How is async/await implemented in Python?"
 
-## API Rate Limits
-
-- **Without GitHub Token**: 60 requests/hour
-- **With GitHub Token**: 5,000 requests/hour
-- **Search API**: 30 requests/minute (with token)
-
 The agent automatically handles rate limiting by using proper headers and error handling.
 
-## Project Structure
-
-```
-examples/multi_agent_github/
-├── __init__.py          # Package initialization
-├── agent.py             # Main agent application
-├── tools.py             # GitHub API integration tools
-├── schemas.py           # Data schemas for agent inputs
-├── sys_prompt.py        # System prompt template
-└── README.md           # This file
 ```
 
 ## Dependencies
@@ -116,7 +92,6 @@ examples/multi_agent_github/
 - Python 3.10+
 - GitHub API access (public repositories)
 - Google Cloud Platform account for VertexAI
-- `requests` library for GitHub API calls
 
 ## Troubleshooting
 

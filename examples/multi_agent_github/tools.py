@@ -32,17 +32,6 @@ class GitHubCodeSearchRequest:
     path: Optional[str] = None
     per_page: int = 30
 
-@dataclass
-class GitHubIssueSearchRequest:
-    """Request parameters for searching GitHub issues and PRs"""
-    query: str
-    organization: Optional[str] = None
-    repository: Optional[str] = None
-    state: str = "all"  # open, closed, all
-    sort: str = "updated"
-    order: str = "desc"
-    per_page: int = 30
-
 def _get_github_client() -> Github:
     """Get authenticated GitHub client."""
     github_token = os.getenv("GITHUB_TOKEN")
@@ -326,95 +315,6 @@ def search_github_code(request: GitHubCodeSearchRequest) -> str:
     except Exception as e:
         logger.error(f"Unexpected error during code search: {str(e)}")
         return f"Error searching code: {str(e)}"
-
-def search_github_issues(request: GitHubIssueSearchRequest) -> str:
-    """Search for GitHub issues and pull requests.
-
-    Args:
-        request: GitHubIssueSearchRequest containing search parameters
-
-    Returns:
-        Formatted string with issue search results
-    """
-    try:
-        g = _get_github_client()
-        
-        # Build search query
-        query_parts = [request.query]
-        
-        if request.organization:
-            query_parts.append(f"org:{request.organization}")
-        
-        if request.repository:
-            query_parts.append(f"repo:{request.repository}")
-        
-        if request.state != "all":
-            query_parts.append(f"state:{request.state}")
-        
-        search_query = " ".join(query_parts)
-        
-        logger.debug(f"GitHub issues search query: '{search_query}'")
-        
-        # Search issues
-        issues = g.search_issues(
-            query=search_query,
-            sort=request.sort,
-            order=request.order
-        )
-        
-        # Get limited results
-        issue_list = list(issues[:request.per_page])
-        total_count = issues.totalCount
-        
-        if not issue_list:
-            return f"No issues found for query: '{search_query}'"
-        
-        # Format results
-        output_lines = [
-            f"Found {total_count} issues/PRs for query: '{search_query}'",
-            f"Showing top {len(issue_list)} results:\n"
-        ]
-        
-        for i, issue in enumerate(issue_list, 1):
-            title = issue.title
-            number = issue.number
-            state = issue.state
-            user = issue.user.login
-            body = issue.body or ""
-            html_url = issue.html_url
-            repository = issue.repository.full_name
-            
-            # Determine if it's a PR or issue
-            is_pr = issue.pull_request is not None
-            item_type = "PR" if is_pr else "Issue"
-            
-            result_text = f"{i}. **{item_type} #{number}**: {title}"
-            result_text += f"\n   Repository: {repository} | State: {state} | Author: {user}"
-            
-            # Add body snippet if available
-            if body:
-                body_snippet = body[:200] + ("..." if len(body) > 200 else "")
-                result_text += f"\n   Description: {body_snippet}"
-            
-            result_text += f"\n   URL: {html_url}\n"
-            
-            output_lines.append(result_text)
-        
-        return "\n".join(output_lines)
-        
-    except GithubException as e:
-        logger.error(f"GitHub API error during issue search: {e.status} - {e.data}")
-        if e.status == 403:
-            return "GitHub API rate limit exceeded. Please add a GITHUB_TOKEN environment variable for higher limits."
-        elif e.status == 401:
-            return "GitHub API authentication failed. Please check your GITHUB_TOKEN."
-        elif e.status == 422:
-            return f"Invalid issue search query. Please try simpler search terms."
-        else:
-            return f"GitHub API error: {e.data.get('message', str(e))}"
-    except Exception as e:
-        logger.error(f"Unexpected error during issue search: {str(e)}")
-        return f"Error searching issues: {str(e)}"
 
 def download_github_file(request) -> str:
     """Download source code file from GitHub repository.

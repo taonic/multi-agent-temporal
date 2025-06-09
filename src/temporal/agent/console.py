@@ -1,6 +1,6 @@
 import asyncio
 import aioconsole
-from temporal.agent.runner import Runner
+from temporal.agent.session import Session
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
@@ -10,8 +10,8 @@ with workflow.unsafe.imports_passed_through():
 class AgentConsole:
     """Console application to interact with the agent."""
     
-    def __init__(self, runner: Runner):
-        self.runner = runner
+    def __init__(self, session: Session):
+        self.session = session
         self.console = Console()
         self.watermark = 0  # Initialize watermark for polling thoughts
 
@@ -35,7 +35,7 @@ class AgentConsole:
         """Poll and display agent's thought process."""
         try:
             while True:
-                thoughts = await self.runner.thoughts(watermark=self.watermark)
+                thoughts = await self.session.thoughts(watermark=self.watermark)
                 if thoughts:
                     for line in thoughts:
                         await aioconsole.aprint(f'\n\033[90m💭 {line}\033[0m')
@@ -72,7 +72,7 @@ class AgentConsole:
         polling_task = asyncio.create_task(self._poll_agent_thoughts())
         
         try:
-            result = await self.runner.prompt(user_input)
+            result = await self.session.prompt(user_input)
             # Format the markdown response for better terminal display
             formatted_result = self._format_markdown_for_terminal(result)
             await aioconsole.aprint(f"\n🤖 Agent: {formatted_result}\n")

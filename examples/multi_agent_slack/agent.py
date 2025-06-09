@@ -1,9 +1,10 @@
 import os
+import secrets
 import asyncio
 import logging
 
 from textwrap import dedent
-from temporal.agent import Agent, Runner, AgentConsole
+from temporal.agent import Agent, Runner, Session, AgentConsole
 
 from .tools import get_slack_channels, search_slack, get_thread_messages
 from .sys_prompt import get_system_prompt
@@ -55,8 +56,9 @@ async def main():
         Send your first message:
     """
 
-    async with Runner(app_name="slack_agent_runner", agent=root_agent) as runner:
-        await AgentConsole(runner).run(welcome_message=dedent(message))
+    async with Runner(app_name="multi_agent_slack", agent=root_agent) as runner:
+        async with Session(session_id=secrets.token_hex(3), client=runner.client, agent=root_agent) as session:
+            await AgentConsole(session=session).run(welcome_message=dedent(message))
 
 
 if __name__ == "__main__":
