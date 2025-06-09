@@ -22,13 +22,18 @@ This example creates a system of specialized agents that work together to help u
 
 ## Setup Instructions
 
-### 1. GitHub Token (Optional but Recommended)
+### 1. GitHub Token
 
 For higher API rate limits, set up a GitHub Personal Access Token:
 
-1. Go to [GitHub Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens)
-2. Generate a new fine-grained personal access tokens: https://github.com/settings/personal-access-tokens (Only public repositories is required)
-3. Set the environment variable:
+1. Go to GitHub Settings > Developer settings > [Personal access tokens](https://github.com/settings/tokens)
+2. Click "Generate new token (classic)"
+3. Give your token a name and select the following scopes:
+   - `repo` (Full control of private repositories)
+   - `read:org` (Read organization membership)
+4. Make sure to authorize access to the Temporal organization if you plan to search Temporal repositories
+5. Click "Generate token" and copy your new token
+6. Set the environment variable:
 
 ```bash
 export GITHUB_TOKEN=your_github_token_here
