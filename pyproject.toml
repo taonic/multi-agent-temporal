@@ -1,7 +1,7 @@
 [project]
 name = "temporal-daf-poc"
 version = "0.1.0"
-description = "Temporal Durable Agent Framework POC"
+description = "Multi-agent Temporal POC"
 readme = "README.md"
 requires-python = ">=3.12.6"
 dependencies = [

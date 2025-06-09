@@ -1,6 +1,6 @@
 # Customer Service Agent Example
 
-This example demonstrates a simple customer service agent built with Temporal's Agent framework. The agent can greet customers and provide order status information.
+This example demonstrates a simple customer service agent built with Temporal. The agent can greet customers and provide order status information.
 
 ## Features
 

@@ -1,10 +1,10 @@
-# Temporal Agent Framework
+# Multi-agent Temporal Examples
 
-A framework for building AI agents that run on Temporal, providing durable execution, workflow orchestration, and multi-agent coordination.
+A lightweight wrapper around Temporal Workflows
 
 ## Overview
 
-This framework lets you build AI agents that can:
+This lightweight Temporal wrapper lets you build AI agents that can:
 - Execute long-running conversations with memory
 - Coordinate multiple specialized sub-agents
 - Handle function calls and tool integrations
@@ -20,7 +20,7 @@ graph TB
         Session[Session]
     end
     
-    subgraph "Agent Framework"
+    subgraph "Temporal Wrapper"
         Agent[Agent]
         Runner[Runner]
     end
@@ -49,11 +49,14 @@ graph TB
     Agent2 -.-> Agent3[Sub-Sub-Agents]
 ```
 
-## Core Concepts
+## Core Components
 
 **Agent**: Defines the AI model, instructions, functions, and sub-agents
+
 **Runner**: Manages Temporal worker and workflow execution  
+
 **Session**: Handles workflow lifecycle and provides interaction methods
+
 **LLMManager**: Handles AI model calls as Temporal activities
 
 ## Quick Start
@@ -99,6 +102,12 @@ root_agent = Agent(
     instruction="You coordinate research tasks",
     sub_agents=[search_agent]
 )
+
+# Run with console interface
+async def main():
+    async with Runner(app_name="research-app", agent=root_agent) as runner:
+        async with Session(client=runner.client, agent=root_agent) as session:
+            await AgentConsole(session=session).run()
 ```
 
 ## Examples
