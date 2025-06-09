@@ -5,6 +5,7 @@ from temporalio.client import Client
 
 from .workflow import AgentWorkflow, AgentWorkflowInput
 from .agent import Agent
+import secrets
 
 class Session:
     """
@@ -15,9 +16,9 @@ class Session:
 
     def __init__(
         self,
-        session_id: str,
         agent: Agent,
         client: Client,
+        session_id: str = None,
         task_queue: str = "agent-task-queue"
     ):
         """Initialize the session.
@@ -28,7 +29,7 @@ class Session:
             client: Connected Temporal client
             task_queue: Task queue name for the workflow
         """
-        self.session_id = session_id
+        self.session_id = session_id if session_id else secrets.token_hex(3)
         self.agent = agent
         self.client = client
         self.task_queue = task_queue

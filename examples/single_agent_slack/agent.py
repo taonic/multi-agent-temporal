@@ -30,7 +30,7 @@ async def main():
     """
     
     async with Runner(app_name="single_agent_slack", agent=agent) as runner:
-        async with Session(session_id=secrets.token_hex(3), client=runner.client, agent=agent) as session:
+        async with Session(client=runner.client, agent=agent) as session:
             await AgentConsole(session=session).run(welcome_message=dedent(message))
 
 if __name__ == "__main__":

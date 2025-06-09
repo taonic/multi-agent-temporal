@@ -8,7 +8,7 @@ from temporal.agent import Agent, Runner, Session, AgentConsole
 
 from .tools import get_repos, search_github_code, download_github_file
 from .sys_prompt import get_system_prompt
-from .schemas import RepositorySchema, CodeSearchSchema, IssueSearchSchema, FileDownloadSchema
+from .schemas import RepositorySchema, CodeSearchSchema, FileDownloadSchema
 
 async def main():
     """Main interactive loop with GitHub-enabled agent."""
@@ -78,7 +78,7 @@ async def main():
     """
 
     async with Runner(app_name="github_research_agent", agent=root_agent) as runner:
-        async with Session(session_id=secrets.token_hex(3), client=runner.client, agent=root_agent) as session:
+        async with Session(client=runner.client, agent=root_agent) as session:
             await AgentConsole(session=session).run(welcome_message=dedent(message))
 
 

@@ -16,7 +16,7 @@ async def main():
         You can check your order status by providing an order ID.
     """
     client = await Client.connect("localhost:7233")
-    async with Session(session_id=secrets.token_hex(3), client=client, agent=agent) as session:
+    async with Session(client=client, agent=agent) as session:
         await AgentConsole(session=session).run(welcome_message=dedent(message))
 
 
